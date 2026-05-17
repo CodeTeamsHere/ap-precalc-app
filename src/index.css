@@ -1,0 +1,117 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+    --bg: #f6f1e7;
+    --bg-soft: #fdfbf6;
+    --ink: #15131a;
+    --ink-soft: #403c34;
+    --line: rgba(21, 19, 26, 0.12);
+    --accent: #c2701b;
+  }
+
+  html.dark {
+    color-scheme: dark;
+    --bg: #100f14;
+    --bg-soft: #181620;
+    --ink: #f4ecd9;
+    --ink-soft: #c9c0a8;
+    --line: rgba(244, 236, 217, 0.14);
+    --accent: #e69640;
+  }
+
+  html, body, #root { height: 100%; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1, h2, h3, h4, h5 {
+    font-family: "Fraunces", ui-serif, Georgia, serif;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  a { color: inherit; }
+
+  ::selection { background: rgba(194, 112, 27, 0.25); }
+
+  /* KaTeX inherits font color from parent text, which respects dark mode. */
+  .katex { font-size: 1.02em; }
+}
+
+@layer components {
+  .surface {
+    background: var(--bg-soft);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+  }
+
+  .card {
+    background: var(--bg-soft);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 20px;
+    box-shadow:
+      0 1px 0 0 rgba(20, 14, 28, 0.04),
+      0 8px 30px -14px rgba(20, 14, 28, 0.18);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 0.95rem;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: var(--bg);
+    font-weight: 500;
+    transition: transform 0.04s ease, background 0.15s ease, border-color 0.15s ease;
+  }
+  .btn:hover { border-color: var(--accent); }
+  .btn:active { transform: translateY(1px); }
+  .btn-primary {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+  .btn-primary:hover { background: var(--accent); border-color: var(--accent); }
+  .btn-ghost { background: transparent; }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.15rem 0.55rem;
+    font-size: 0.78rem;
+    font-weight: 500;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--bg);
+  }
+
+  .prose-tight p { margin: 0.5rem 0; }
+  .prose-tight li { margin: 0.15rem 0; }
+
+  .focusring:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(194, 112, 27, 0.35);
+    border-radius: 8px;
+  }
+}
+
+/* Scrollbar polish (Webkit) */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb {
+  background: rgba(21, 19, 26, 0.18);
+  border-radius: 999px;
+}
+html.dark ::-webkit-scrollbar-thumb { background: rgba(244, 236, 217, 0.18); }
