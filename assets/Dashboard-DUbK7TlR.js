@@ -1,4 +1,4 @@
-import{c as j,u as i,T as $,j as e,L as N,U as A,a as E,h as H}from"./index-DXdr4-4L.js";import{r as L}from"./plotly-D892fyfE.js";import"./math-CQXetOEp.js";import"./katex-CabThPWh.js";/**
+import{c as j,u as i,T as $,j as e,L as N,U as A,a as E,m as H}from"./index-CohkCdwS.js";import{r as L}from"./plotly-D892fyfE.js";import"./math-CQXetOEp.js";import"./katex-CabThPWh.js";/**
  * @license lucide-react v0.439.0 - ISC
  *
  * This source code is licensed under the ISC license.
