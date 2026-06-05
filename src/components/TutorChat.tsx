@@ -3,7 +3,13 @@ import { useLocation } from "react-router-dom";
 import { askTutor } from "../lib/tutor";
 import { getTopic } from "../data/curriculum";
 import { RichText } from "./Math";
-import { Sparkles, Send, X, Bot, User } from "lucide-react";
+import {
+  cancelSpeech, isSpeaking, listen, speak, sttAvailable, ttsAvailable,
+  type STTSession,
+} from "../lib/voice";
+import {
+  Sparkles, Send, X, Bot, User, Volume2, VolumeX, Mic, MicOff, StopCircle,
+} from "lucide-react";
 
 interface Msg { role: "user" | "tutor"; text: string }
 
@@ -19,14 +25,39 @@ export default function TutorChat() {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Msg[]>([]);
   const [busy, setBusy] = useState(false);
+  const [autoSpeak, setAutoSpeak] = useState(false);
+  const [speakingId, setSpeakingId] = useState<number | null>(null);
+  const [listening, setListening] = useState(false);
+  const sttSession = useRef<STTSession | null>(null);
   const location = useLocation();
   const listRef = useRef<HTMLDivElement>(null);
 
   const context = useContextForRoute(location.pathname);
+  const ttsOk = ttsAvailable();
+  const sttOk = sttAvailable();
 
   useEffect(() => {
     if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
   }, [messages, busy, open]);
+
+  // Stop speech when chat closes.
+  useEffect(() => {
+    if (!open) {
+      cancelSpeech();
+      setSpeakingId(null);
+      stopListening();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const speakMessage = useCallback((idx: number, text: string) => {
+    if (!ttsOk) return;
+    if (isSpeaking()) { cancelSpeech(); setSpeakingId(null); return; }
+    setSpeakingId(idx);
+    speak(text, {
+      onEnd: () => setSpeakingId(null),
+    });
+  }, [ttsOk]);
 
   const send = useCallback(async (text: string) => {
     if (!text.trim() || busy) return;
@@ -34,9 +65,51 @@ export default function TutorChat() {
     setMessages((m) => [...m, { role: "user", text }]);
     setBusy(true);
     const res = await askTutor(text, context);
-    setMessages((m) => [...m, { role: "tutor", text: res.text }]);
+    setMessages((m) => {
+      const updated = [...m, { role: "tutor" as const, text: res.text }];
+      // Auto-speak the brand-new tutor message.
+      if (autoSpeak && ttsOk) {
+        setTimeout(() => {
+          setSpeakingId(updated.length - 1);
+          speak(res.text, { onEnd: () => setSpeakingId(null) });
+        }, 80);
+      }
+      return updated;
+    });
     setBusy(false);
-  }, [busy, context]);
+  }, [busy, context, autoSpeak, ttsOk]);
+
+  const stopListening = useCallback(() => {
+    sttSession.current?.stop();
+    sttSession.current = null;
+    setListening(false);
+  }, []);
+
+  const startListening = useCallback(() => {
+    if (!sttOk) return;
+    cancelSpeech();
+    setListening(true);
+    let buffer = "";
+    sttSession.current = listen({
+      onPartial: (t) => setInput((existing) => buffer + t || existing),
+      onFinal: (t) => {
+        buffer += t + " ";
+        setInput(buffer.trim());
+      },
+      onError: () => { setListening(false); sttSession.current = null; },
+      onEnd: () => {
+        setListening(false);
+        sttSession.current = null;
+        // Auto-send when the user stops talking.
+        if (buffer.trim()) {
+          const final = buffer.trim();
+          buffer = "";
+          // Use setTimeout so React updates the input first.
+          setTimeout(() => send(final), 50);
+        }
+      },
+    }, { interim: true });
+  }, [sttOk, send]);
 
   return (
     <>
@@ -54,14 +127,34 @@ export default function TutorChat() {
           <header className="px-4 py-3 border-b border-[color:var(--line)] flex items-center gap-2">
             <Sparkles size={16} className="text-[color:var(--accent)]" />
             <h2 className="font-display text-base">AP Precalc tutor</h2>
-            <span className="ml-auto text-[10px] text-[color:var(--ink-soft)] font-mono">{context.slice(0, 32)}…</span>
+            <div className="ml-auto flex items-center gap-1">
+              {ttsOk && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAutoSpeak((v) => {
+                      if (v) { cancelSpeech(); setSpeakingId(null); }
+                      return !v;
+                    });
+                  }}
+                  aria-label={autoSpeak ? "Voice on — click to mute" : "Voice off — click to enable"}
+                  title={autoSpeak ? "Voice on" : "Voice off"}
+                  className="btn btn-ghost p-1.5"
+                >
+                  {autoSpeak ? <Volume2 size={14} className="text-[color:var(--accent)]" /> : <VolumeX size={14} />}
+                </button>
+              )}
+              <span className="text-[10px] text-[color:var(--ink-soft)] font-mono truncate max-w-[120px]" title={context}>
+                {context.replace(/Student is /, "").slice(0, 24)}…
+              </span>
+            </div>
           </header>
 
           <div ref={listRef} className="flex-1 overflow-y-auto p-3 space-y-3">
             {messages.length === 0 && (
               <>
                 <p className="text-sm text-[color:var(--ink-soft)]">
-                  Ask anything about the topic you're on. The tutor uses puter.js (free, no API key) and renders math with LaTeX.
+                  Ask about the topic you're on. {ttsOk && "Click the speaker icon for voice replies."} {sttOk && "Use the mic to speak your question."}
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {SUGGESTIONS.map((s) => (
@@ -70,13 +163,26 @@ export default function TutorChat() {
                     </button>
                   ))}
                 </div>
+                {!ttsOk && (
+                  <p className="text-[10px] text-[color:var(--ink-soft)]">
+                    Voice features require a modern Chromium-based browser.
+                  </p>
+                )}
               </>
             )}
             {messages.map((m, i) => (
-              <MsgBubble key={i} msg={m} />
+              <MsgBubble
+                key={i}
+                msg={m}
+                speaking={speakingId === i}
+                onSpeak={ttsOk && m.role === "tutor" ? () => speakMessage(i, m.text) : undefined}
+              />
             ))}
-            {busy && (
-              <MsgBubble msg={{ role: "tutor", text: "Thinking…" }} />
+            {busy && <MsgBubble msg={{ role: "tutor", text: "Thinking…" }} />}
+            {listening && (
+              <div className="text-xs text-[color:var(--accent)] flex items-center gap-1.5 font-mono animate-pulse">
+                <Mic size={12} /> Listening…
+              </div>
             )}
           </div>
 
@@ -84,12 +190,24 @@ export default function TutorChat() {
             onSubmit={(e) => { e.preventDefault(); send(input); }}
             className="border-t border-[color:var(--line)] p-2 flex gap-2"
           >
+            {sttOk && (
+              <button
+                type="button"
+                onClick={() => listening ? stopListening() : startListening()}
+                aria-label={listening ? "Stop listening" : "Start voice input"}
+                className={`btn p-2 ${listening ? "bg-[color:var(--accent)] text-white border-[color:var(--accent)]" : "btn-ghost"}`}
+                disabled={busy}
+              >
+                {listening ? <MicOff size={14} /> : <Mic size={14} />}
+              </button>
+            )}
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask about this lesson or problem…"
+              placeholder={listening ? "Listening…" : "Ask about this lesson or problem…"}
               className="flex-1 px-3 py-2 bg-transparent border border-[color:var(--line)] rounded-lg focusring"
               aria-label="Tutor question"
+              disabled={listening}
             />
             <button type="submit" disabled={!input.trim() || busy} className="btn btn-primary disabled:opacity-50">
               <Send size={14} />
@@ -103,7 +221,7 @@ export default function TutorChat() {
   );
 }
 
-function MsgBubble({ msg }: { msg: Msg }) {
+function MsgBubble({ msg, speaking, onSpeak }: { msg: Msg; speaking?: boolean; onSpeak?: () => void }) {
   const isUser = msg.role === "user";
   return (
     <div className={`flex gap-2 text-sm ${isUser ? "justify-end" : ""}`}>
@@ -118,6 +236,18 @@ function MsgBubble({ msg }: { msg: Msg }) {
         }`}
       >
         <RichText>{msg.text}</RichText>
+        {onSpeak && (
+          <div className="mt-1 text-right">
+            <button
+              type="button"
+              onClick={onSpeak}
+              aria-label={speaking ? "Stop speaking" : "Read aloud"}
+              className="text-[11px] inline-flex items-center gap-1 text-[color:var(--ink-soft)] hover:text-[color:var(--accent)]"
+            >
+              {speaking ? <><StopCircle size={11} /> Stop</> : <><Volume2 size={11} /> Listen</>}
+            </button>
+          </div>
+        )}
       </div>
       {isUser && (
         <span className="shrink-0 rounded-full w-7 h-7 flex items-center justify-center bg-[color:var(--bg)] border border-[color:var(--line)]">

@@ -3,7 +3,8 @@ import { RichText } from "./Math";
 import { gradeFR } from "../lib/grader";
 import { skillById } from "../data/curriculum";
 import type { Problem } from "../data/problems";
-import { Check, X, RotateCw, Calculator, CalculatorIcon, ChevronDown, ChevronUp } from "lucide-react";
+import { cancelSpeech, isSpeaking, speak, ttsAvailable } from "../lib/voice";
+import { Check, X, RotateCw, Calculator, CalculatorIcon, ChevronDown, ChevronUp, Volume2, StopCircle } from "lucide-react";
 
 const Grapher = lazy(() => import("./Grapher"));
 
@@ -34,7 +35,9 @@ export default function ProblemCard({ problem, onAttempt, hideSolution, bare, on
   const [submitted, setSubmitted] = useState(false);
   const [correct, setCorrect] = useState(false);
   const [showSolution, setShowSolution] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
   const startedAt = useMemo(() => Date.now(), [resetKey, problem.id]);
+  const ttsOk = ttsAvailable();
 
   // Reset when problem changes
   useEffect(() => {
@@ -43,7 +46,36 @@ export default function ProblemCard({ problem, onAttempt, hideSolution, bare, on
     setSubmitted(false);
     setCorrect(false);
     setShowSolution(false);
+    cancelSpeech();
+    setSpeaking(false);
   }, [resetKey, problem.id]);
+
+  // Stop any in-progress speech when this card unmounts.
+  useEffect(() => () => { cancelSpeech(); }, []);
+
+  // Build the spoken script: question (and choices if MC), optionally answer + steps.
+  const speakProblem = (includeSolution: boolean) => {
+    if (!ttsOk) return;
+    if (isSpeaking()) { cancelSpeech(); setSpeaking(false); return; }
+    let script = `Question. ${problem.prompt}.`;
+    if (problem.type === "mc") {
+      script += " Choices: ";
+      problem.choices.forEach((c, i) => {
+        script += ` Option ${String.fromCharCode(65 + i)}: ${c}. `;
+      });
+    }
+    if (includeSolution) {
+      script += " Worked solution. ";
+      problem.solution.forEach((s, i) => { script += ` Step ${i + 1}. ${s}. `; });
+      if (problem.type === "mc") {
+        script += ` The correct answer is ${String.fromCharCode(65 + problem.correctIndex)}: ${problem.choices[problem.correctIndex]}.`;
+      } else {
+        script += ` The expected answer is ${problem.expectedAnswer}.`;
+      }
+    }
+    setSpeaking(true);
+    speak(script, { onEnd: () => setSpeaking(false), rate: 0.95 });
+  };
 
   const submit = () => {
     if (submitted) return;
@@ -87,6 +119,18 @@ export default function ProblemCard({ problem, onAttempt, hideSolution, bare, on
           <span className="text-[10px]">{problem.calculatorAllowed ? "calc" : "no calc"}</span>
         </span>
         <span className="chip">{problem.type === "mc" ? "Multiple choice" : "Free response"}</span>
+        {ttsOk && (
+          <button
+            type="button"
+            onClick={() => speakProblem(submitted)}
+            className="chip hover:border-[color:var(--accent)]"
+            aria-label={speaking ? "Stop reading" : "Read question aloud"}
+            title={speaking ? "Stop reading" : (submitted ? "Read question + worked solution" : "Read question aloud")}
+          >
+            {speaking ? <StopCircle size={12} /> : <Volume2 size={12} />}
+            <span className="text-[10px]">{speaking ? "Stop" : "Listen"}</span>
+          </button>
+        )}
       </header>
 
       <p className="text-base leading-relaxed">

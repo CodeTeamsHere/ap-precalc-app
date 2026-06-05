@@ -47,8 +47,8 @@ export interface FRProblem {
 
 export type Problem = MCProblem | FRProblem;
 
-// Helper for declaring problems compactly.
-const mc = (
+// Helper for declaring problems compactly. Exported so problems_extra.ts can reuse them.
+export const mc = (
   id: string,
   topicId: string,
   skill: SkillCode,
@@ -61,7 +61,7 @@ const mc = (
   graph?: MCProblem["graph"]
 ): MCProblem => ({ id, topicId, skill, difficulty, calculatorAllowed, type: "mc", prompt, choices, correctIndex, solution, graph });
 
-const fr = (
+export const fr = (
   id: string,
   topicId: string,
   skill: SkillCode,
@@ -73,7 +73,9 @@ const fr = (
   extras?: { acceptedAnswers?: string[]; numericTolerance?: number; graph?: FRProblem["graph"] }
 ): FRProblem => ({ id, topicId, skill, difficulty, calculatorAllowed, type: "fr", prompt, expectedAnswer, ...extras, solution });
 
-export const PROBLEMS: Problem[] = [
+import { EXTRA_PROBLEMS } from "./problems_extra";
+
+const CORE_PROBLEMS: Problem[] = [
   // ====================================================================
   // UNIT 1 — Polynomial and Rational Functions
   // ====================================================================
@@ -2145,6 +2147,10 @@ export const PROBLEMS: Problem[] = [
     ["$\\pi/2$", "$\\pi$", "$2\\pi$", "$\\pi/4$"], 0,
     ["Each petal spans $\\pi/2$ of $\\theta$."]),
 ];
+
+// Final exported pool merges the core problems with the extras file.
+// Add more problems by appending to either array.
+export const PROBLEMS: Problem[] = [...CORE_PROBLEMS, ...EXTRA_PROBLEMS];
 
 // ---------------------------------------------------------------------------
 // Lookups
