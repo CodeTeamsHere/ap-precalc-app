@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect } from "react";
 import { Routes, Route, NavLink, Link } from "react-router-dom";
 import { useProgress } from "./store/progress";
 import TutorChat from "./components/TutorChat";
+import FloatingTools from "./components/FloatingTools";
 
 const Home = lazy(() => import("./routes/Home"));
 const Unit = lazy(() => import("./routes/Unit"));
@@ -137,6 +138,7 @@ export default function App() {
       </footer>
 
       <TutorChat />
+      <FloatingTools />
     </div>
   );
 }
